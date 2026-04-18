@@ -1,0 +1,49 @@
+{
+  "type": "record",
+  "name": "BetEvent",
+  "namespace": "com.entain.betsafe.common.event",
+  "doc": "Bet placement event — produced by Sportsbook and Casino",
+  "fields": [
+    {
+      "name": "bet_id",
+      "type": "string",
+      "doc": "Unique bet identifier"
+    },
+    {
+      "name": "market_id",
+      "type": "string",
+      "doc": "Market identifier for the bet"
+    },
+    {
+      "name": "stake",
+      "type": "string",
+      "doc": "Stake amount as string — never double or float"
+    },
+    {
+      "name": "currency",
+      "type": "string",
+      "doc": "ISO 4217 currency code"
+    },
+    {
+      "name": "game_type",
+      "type": {
+        "type": "enum",
+        "name": "GameType",
+        "namespace": "com.entain.betsafe.common.event",
+        "symbols": ["UNKNOWN", "SPORTS", "CASINO", "POKER", "BINGO", "VIRTUAL"]
+      },
+      "doc": "Type of game"
+    },
+    {
+      "name": "odds",
+      "type": "string",
+      "doc": "Odds as string — never double or float"
+    },
+    {
+      "name": "is_in_play",
+      "type": "boolean",
+      "default": false,
+      "doc": "Whether the bet was placed during live play"
+    }
+  ]
+}

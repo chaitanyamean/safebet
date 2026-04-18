@@ -1,0 +1,17 @@
+com/entain/betsafe/common/event/BetEvent$Builder.class
+com/entain/betsafe/common/event/GameType.class
+com/entain/betsafe/common/event/PaymentMethod.class
+com/entain/betsafe/common/event/PlayerEvent.class
+com/entain/betsafe/common/event/GameResult.class
+com/entain/betsafe/common/event/BetEvent.class
+com/entain/betsafe/common/event/SessionEvent.class
+com/entain/betsafe/common/event/SessionSubtype.class
+com/entain/betsafe/common/util/HashUtil.class
+com/entain/betsafe/common/event/DepositEvent.class
+com/entain/betsafe/common/event/PlayerEvent$Builder.class
+com/entain/betsafe/common/event/DeviceType.class
+com/entain/betsafe/common/event/GameResultEvent.class
+com/entain/betsafe/common/event/GameResultEvent$Builder.class
+com/entain/betsafe/common/event/EventType.class
+com/entain/betsafe/common/event/DepositEvent$Builder.class
+com/entain/betsafe/common/event/SessionEvent$Builder.class

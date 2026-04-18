@@ -1,0 +1,55 @@
+{
+  "type": "record",
+  "name": "PlayerEvent",
+  "namespace": "com.entain.betsafe.common.event",
+  "doc": "Base envelope for all player events in the BetSafe pipeline",
+  "fields": [
+    {
+      "name": "event_id",
+      "type": "string",
+      "doc": "Unique event identifier — UUID v4 format required"
+    },
+    {
+      "name": "event_type",
+      "type": {
+        "type": "enum",
+        "name": "EventType",
+        "namespace": "com.entain.betsafe.common.event",
+        "symbols": ["UNKNOWN", "BET", "DEPOSIT", "SESSION", "GAME_RESULT"]
+      },
+      "doc": "Type of player event"
+    },
+    {
+      "name": "player_id",
+      "type": "string",
+      "doc": "Player identifier — must be hashed before storage or logging"
+    },
+    {
+      "name": "tenant_id",
+      "type": "string",
+      "doc": "Tenant identifier for multi-tenancy isolation"
+    },
+    {
+      "name": "brand_id",
+      "type": "string",
+      "doc": "Brand identifier within the tenant"
+    },
+    {
+      "name": "client_timestamp",
+      "type": "long",
+      "doc": "Client-side event timestamp in epoch milliseconds"
+    },
+    {
+      "name": "server_ingest_timestamp",
+      "type": "long",
+      "default": 0,
+      "doc": "Server-side ingestion timestamp in epoch milliseconds — set by gateway"
+    },
+    {
+      "name": "schema_version",
+      "type": "int",
+      "default": 1,
+      "doc": "Schema version — incremented on breaking changes"
+    }
+  ]
+}

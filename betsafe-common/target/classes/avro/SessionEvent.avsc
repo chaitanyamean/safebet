@@ -1,0 +1,38 @@
+{
+  "type": "record",
+  "name": "SessionEvent",
+  "namespace": "com.entain.betsafe.common.event",
+  "doc": "Session lifecycle event — produced by all clients",
+  "fields": [
+    {
+      "name": "session_id",
+      "type": "string",
+      "doc": "Unique session identifier"
+    },
+    {
+      "name": "event_subtype",
+      "type": {
+        "type": "enum",
+        "name": "SessionSubtype",
+        "namespace": "com.entain.betsafe.common.event",
+        "symbols": ["UNKNOWN", "START", "END", "HEARTBEAT"]
+      },
+      "doc": "Session event subtype"
+    },
+    {
+      "name": "device_type",
+      "type": {
+        "type": "enum",
+        "name": "DeviceType",
+        "namespace": "com.entain.betsafe.common.event",
+        "symbols": ["UNKNOWN", "DESKTOP", "MOBILE", "TABLET", "APP"]
+      },
+      "doc": "Device type used for the session"
+    },
+    {
+      "name": "ip_address_hash",
+      "type": "string",
+      "doc": "SHA-256 hash of IP address — raw IP never stored"
+    }
+  ]
+}

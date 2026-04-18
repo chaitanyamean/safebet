@@ -1,0 +1,39 @@
+{
+  "type": "record",
+  "name": "DepositEvent",
+  "namespace": "com.entain.betsafe.common.event",
+  "doc": "Player deposit event — produced by Payments",
+  "fields": [
+    {
+      "name": "transaction_id",
+      "type": "string",
+      "doc": "Unique transaction identifier"
+    },
+    {
+      "name": "amount",
+      "type": "string",
+      "doc": "Deposit amount as string — never double or float"
+    },
+    {
+      "name": "currency",
+      "type": "string",
+      "doc": "ISO 4217 currency code"
+    },
+    {
+      "name": "payment_method",
+      "type": {
+        "type": "enum",
+        "name": "PaymentMethod",
+        "namespace": "com.entain.betsafe.common.event",
+        "symbols": ["UNKNOWN", "CARD", "BANK_TRANSFER", "E_WALLET", "CRYPTO", "PREPAID"]
+      },
+      "doc": "Payment method used for deposit"
+    },
+    {
+      "name": "is_first_deposit",
+      "type": "boolean",
+      "default": false,
+      "doc": "Whether this is the player's first deposit"
+    }
+  ]
+}

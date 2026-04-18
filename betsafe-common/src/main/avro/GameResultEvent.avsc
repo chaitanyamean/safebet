@@ -1,0 +1,43 @@
+{
+  "type": "record",
+  "name": "GameResultEvent",
+  "namespace": "com.entain.betsafe.common.event",
+  "doc": "Win or loss outcome event — produced by Casino and Games",
+  "fields": [
+    {
+      "name": "game_id",
+      "type": "string",
+      "doc": "Unique game identifier"
+    },
+    {
+      "name": "game_type",
+      "type": "com.entain.betsafe.common.event.GameType",
+      "doc": "Type of game"
+    },
+    {
+      "name": "result",
+      "type": {
+        "type": "enum",
+        "name": "GameResult",
+        "namespace": "com.entain.betsafe.common.event",
+        "symbols": ["UNKNOWN", "WIN", "LOSS", "VOID"]
+      },
+      "doc": "Game result outcome"
+    },
+    {
+      "name": "stake",
+      "type": "string",
+      "doc": "Stake amount as string — never double or float"
+    },
+    {
+      "name": "return_amount",
+      "type": "string",
+      "doc": "Return amount as string — never double or float"
+    },
+    {
+      "name": "session_id",
+      "type": "string",
+      "doc": "Session identifier linking to the player session"
+    }
+  ]
+}
