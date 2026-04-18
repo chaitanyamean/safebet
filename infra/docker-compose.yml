@@ -1,0 +1,379 @@
+version: "3.9"
+
+networks:
+  betsafe-network:
+    driver: bridge
+
+volumes:
+  kafka-data:
+  postgres-data:
+  minio-data:
+  grafana-data:
+
+services:
+  # ─── Kafka (KRaft mode — no Zookeeper) ───
+  kafka:
+    image: apache/kafka:3.7.0
+    container_name: betsafe-kafka
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_LOG_DIRS: /var/lib/kafka/data
+      CLUSTER_ID: "betsafe-local-cluster-001"
+    volumes:
+      - kafka-data:/var/lib/kafka/data
+    networks:
+      - betsafe-network
+    healthcheck:
+      test: ["CMD-SHELL", "kafka-broker-api-versions.sh --bootstrap-server localhost:9092 || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+
+  # ─── Schema Registry ───
+  schema-registry:
+    image: confluentinc/cp-schema-registry:7.6.0
+    container_name: betsafe-schema-registry
+    ports:
+      - "8081:8081"
+    environment:
+      SCHEMA_REGISTRY_HOST_NAME: schema-registry
+      SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: kafka:9092
+      SCHEMA_REGISTRY_LISTENERS: http://0.0.0.0:8081
+    depends_on:
+      kafka:
+        condition: service_healthy
+    networks:
+      - betsafe-network
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8081/subjects || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+
+  # ─── Kafka UI ───
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: betsafe-kafka-ui
+    ports:
+      - "8080:8080"
+    environment:
+      KAFKA_CLUSTERS_0_NAME: betsafe-local
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
+      KAFKA_CLUSTERS_0_SCHEMAREGISTRY: http://schema-registry:8081
+    depends_on:
+      kafka:
+        condition: service_healthy
+      schema-registry:
+        condition: service_healthy
+    networks:
+      - betsafe-network
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/actuator/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+
+  # ─── PostgreSQL ───
+  postgres:
+    image: postgres:16-alpine
+    container_name: betsafe-postgres
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-betsafe}
+      POSTGRES_USER: ${POSTGRES_USER:-betsafe}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-betsafe_secret}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - betsafe-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-betsafe}"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+
+  # ─── pgAdmin ───
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: betsafe-pgadmin
+    ports:
+      - "5050:80"
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL:-admin@betsafe.local}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD:-pgadmin_secret}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - betsafe-network
+    healthcheck:
+      test: ["CMD-SHELL", "wget --spider -q http://localhost:80/misc/ping || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+
+  # ─── MinIO ───
+  minio:
+    image: minio/minio:latest
+    container_name: betsafe-minio
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin_secret}
+    command: server /data --console-address ":9001"
+    volumes:
+      - minio-data:/data
+    networks:
+      - betsafe-network
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9000/minio/health/live || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+
+  # ─── Redis (Phase 2 prep) ───
+  redis:
+    image: redis:7-alpine
+    container_name: betsafe-redis
+    ports:
+      - "6379:6379"
+    networks:
+      - betsafe-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+
+  # ─── Prometheus ───
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: betsafe-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    networks:
+      - betsafe-network
+    healthcheck:
+      test: ["CMD-SHELL", "wget --spider -q http://localhost:9090/-/healthy || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+
+  # ─── Grafana ───
+  grafana:
+    image: grafana/grafana:latest
+    container_name: betsafe-grafana
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GF_SECURITY_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GF_SECURITY_ADMIN_PASSWORD:-grafana_secret}
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+    depends_on:
+      prometheus:
+        condition: service_healthy
+    networks:
+      - betsafe-network
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:3000/api/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+
+  # ─── Flink JobManager ───
+  flink-jobmanager:
+    image: apache/flink:1.18-java17
+    container_name: betsafe-flink-jobmanager
+    ports:
+      - "8082:8081"
+    environment:
+      FLINK_PROPERTIES: |
+        jobmanager.rpc.address: flink-jobmanager
+        state.backend: rocksdb
+        state.checkpoints.dir: s3://betsafe-checkpoints/flink/
+        s3.endpoint: http://minio:9000
+        s3.access-key: minioadmin
+        s3.secret-key: minioadmin_secret
+        s3.path.style.access: true
+        metrics.reporter.prom.factory.class: org.apache.flink.metrics.prometheus.PrometheusReporterFactory
+        metrics.reporter.prom.port: 9249
+    command: >
+      bash -c "
+        /docker-entrypoint.sh jobmanager &
+        sleep 30 &&
+        /opt/flink/bin/flink run /opt/flink/jars/betsafe-processor-1.0.0-SNAPSHOT.jar &
+        wait
+      "
+    volumes:
+      - ../betsafe-processor/target/betsafe-processor-1.0.0-SNAPSHOT.jar:/opt/flink/jars/betsafe-processor-1.0.0-SNAPSHOT.jar:ro
+    depends_on:
+      kafka:
+        condition: service_healthy
+      schema-registry:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    networks:
+      - betsafe-network
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8081/overview || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 1024M
+
+  # ─── Flink TaskManager 1 ───
+  flink-taskmanager-1:
+    image: apache/flink:1.18-java17
+    container_name: betsafe-flink-taskmanager-1
+    command: taskmanager
+    environment:
+      FLINK_PROPERTIES: |
+        jobmanager.rpc.address: flink-jobmanager
+        taskmanager.numberOfTaskSlots: 4
+        taskmanager.memory.process.size: 1536m
+        state.backend: rocksdb
+        state.checkpoints.dir: s3://betsafe-checkpoints/flink/
+        s3.endpoint: http://minio:9000
+        s3.access-key: minioadmin
+        s3.secret-key: minioadmin_secret
+        s3.path.style.access: true
+        metrics.reporter.prom.factory.class: org.apache.flink.metrics.prometheus.PrometheusReporterFactory
+        metrics.reporter.prom.port: 9249
+    depends_on:
+      flink-jobmanager:
+        condition: service_healthy
+    networks:
+      - betsafe-network
+    deploy:
+      resources:
+        limits:
+          memory: 1536M
+
+  # ─── Flink TaskManager 2 ───
+  flink-taskmanager-2:
+    image: apache/flink:1.18-java17
+    container_name: betsafe-flink-taskmanager-2
+    command: taskmanager
+    environment:
+      FLINK_PROPERTIES: |
+        jobmanager.rpc.address: flink-jobmanager
+        taskmanager.numberOfTaskSlots: 4
+        taskmanager.memory.process.size: 1536m
+        state.backend: rocksdb
+        state.checkpoints.dir: s3://betsafe-checkpoints/flink/
+        s3.endpoint: http://minio:9000
+        s3.access-key: minioadmin
+        s3.secret-key: minioadmin_secret
+        s3.path.style.access: true
+        metrics.reporter.prom.factory.class: org.apache.flink.metrics.prometheus.PrometheusReporterFactory
+        metrics.reporter.prom.port: 9249
+    depends_on:
+      flink-jobmanager:
+        condition: service_healthy
+    networks:
+      - betsafe-network
+    deploy:
+      resources:
+        limits:
+          memory: 1536M
+
+  # ─── BetSafe Gateway ───
+  betsafe-gateway:
+    build:
+      context: ../
+      dockerfile: betsafe-gateway/Dockerfile
+    container_name: betsafe-gateway
+    ports:
+      - "8090:8090"
+    environment:
+      SPRING_PROFILES_ACTIVE: local
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      SCHEMA_REGISTRY_URL: http://schema-registry:8081
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: ${POSTGRES_DB:-betsafe}
+      POSTGRES_USER: ${POSTGRES_USER:-betsafe}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-betsafe_secret}
+      MINIO_ENDPOINT: http://minio:9000
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-minioadmin}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-minioadmin_secret}
+    depends_on:
+      kafka:
+        condition: service_healthy
+      schema-registry:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    networks:
+      - betsafe-network
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8090/actuator/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          memory: 2G

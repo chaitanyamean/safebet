@@ -1,0 +1,357 @@
+{
+  "annotations": { "list": [] },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "liveNow": false,
+  "panels": [
+    {
+      "title": "Kafka Consumer Lag — Ledger",
+      "description": "Consumer lag for betsafe-ledger-consumer. Primary pipeline health signal — high lag means events are backing up.",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "targets": [
+        {
+          "expr": "betsafe_kafka_consumer_lag{consumer_group=\"betsafe-ledger-consumer\"}",
+          "legendFormat": "{{topic}} - p{{partition}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "color": { "mode": "palette-classic" }, "unit": "short" }
+      }
+    },
+    {
+      "title": "Kafka Consumer Lag — Archive",
+      "description": "Consumer lag for betsafe-archive-consumer. High lag means Parquet archive is falling behind.",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "targets": [
+        {
+          "expr": "betsafe_kafka_consumer_lag{consumer_group=\"betsafe-archive-consumer\"}",
+          "legendFormat": "{{topic}} - p{{partition}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "color": { "mode": "palette-classic" }, "unit": "short" }
+      }
+    },
+    {
+      "title": "Events/sec by Tenant",
+      "description": "Rate of accepted events per tenant per second. Shows ingestion throughput.",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 8 },
+      "targets": [
+        {
+          "expr": "rate(betsafe_events_accepted_total[1m])",
+          "legendFormat": "{{tenant_id}} - {{event_type}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "color": { "mode": "palette-classic" }, "unit": "ops" }
+      }
+    },
+    {
+      "title": "Acceptance Rate %",
+      "description": "Percentage of received events that were accepted. Below 90% triggers a warning.",
+      "type": "gauge",
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 8 },
+      "targets": [
+        {
+          "expr": "sum(rate(betsafe_events_accepted_total[5m])) / sum(rate(betsafe_events_received_total[5m])) * 100"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0,
+          "max": 100,
+          "thresholds": {
+            "steps": [
+              { "color": "red", "value": 0 },
+              { "color": "yellow", "value": 90 },
+              { "color": "green", "value": 95 }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "title": "Rate Limit Rejections/sec",
+      "description": "Rate of 429 responses per tenant. Spikes indicate tenant is exceeding their EPS allocation.",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 8 },
+      "targets": [
+        {
+          "expr": "rate(betsafe_rate_limit_exceeded_total[1m])",
+          "legendFormat": "{{tenant_id}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "color": { "mode": "palette-classic" }, "unit": "ops" }
+      }
+    },
+    {
+      "title": "Ingestion Latency P50/P95/P99",
+      "description": "Gateway receive to Kafka publish latency. P95 above 200ms triggers a warning.",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.50, rate(betsafe_event_ingestion_latency_seconds_bucket[5m]))",
+          "legendFormat": "P50"
+        },
+        {
+          "expr": "histogram_quantile(0.95, rate(betsafe_event_ingestion_latency_seconds_bucket[5m]))",
+          "legendFormat": "P95"
+        },
+        {
+          "expr": "histogram_quantile(0.99, rate(betsafe_event_ingestion_latency_seconds_bucket[5m]))",
+          "legendFormat": "P99"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "color": { "mode": "palette-classic" }, "unit": "s" }
+      }
+    },
+    {
+      "title": "Ledger Write Latency P95",
+      "description": "Kafka consume to PostgreSQL insert latency. P95 above 500ms triggers a warning.",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, rate(betsafe_ledger_write_latency_seconds_bucket[5m]))",
+          "legendFormat": "{{tenant_id}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "color": { "mode": "palette-classic" }, "unit": "s" }
+      }
+    },
+    {
+      "title": "Total Ledger Writes",
+      "description": "Cumulative rows written to the PostgreSQL audit ledger per tenant.",
+      "type": "stat",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 24 },
+      "targets": [
+        {
+          "expr": "betsafe_ledger_writes_total",
+          "legendFormat": "{{tenant_id}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "short" }
+      }
+    },
+    {
+      "title": "Archive Files Uploaded",
+      "description": "Total Parquet files uploaded to MinIO per tenant.",
+      "type": "stat",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 24 },
+      "targets": [
+        {
+          "expr": "betsafe_archive_files_uploaded_total",
+          "legendFormat": "{{tenant_id}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "short" }
+      }
+    },
+    {
+      "title": "Flink Events Processed/sec",
+      "description": "Rate of events processed by the Flink pipeline per event type.",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 32 },
+      "targets": [
+        {
+          "expr": "rate(betsafe_flink_events_processed_total[1m])",
+          "legendFormat": "{{event_type}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "color": { "mode": "palette-classic" }, "unit": "ops" }
+      }
+    },
+    {
+      "title": "Clock Skew Distribution",
+      "description": "Stacked rate of clock skew tier classifications: tier1 (<5min), tier2 (5-120min), tier3 (>120min).",
+      "type": "barchart",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 32 },
+      "options": {
+        "stacking": { "mode": "normal" }
+      },
+      "targets": [
+        {
+          "expr": "rate(betsafe_flink_clock_skew_tier1_total[5m])",
+          "legendFormat": "Tier 1 (<5min)"
+        },
+        {
+          "expr": "rate(betsafe_flink_clock_skew_tier2_total[5m])",
+          "legendFormat": "Tier 2 (5-120min)"
+        },
+        {
+          "expr": "rate(betsafe_flink_clock_skew_tier3_total[5m])",
+          "legendFormat": "Tier 3 (>120min)"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "color": { "mode": "palette-classic" }, "unit": "ops" }
+      }
+    },
+    {
+      "title": "Redis Write Latency P95",
+      "description": "P95 latency of Redis pipelined writes from Flink operators.",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 40 },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, rate(betsafe_flink_redis_write_latency_ms_bucket[5m]))",
+          "legendFormat": "{{prefix}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "color": { "mode": "palette-classic" }, "unit": "ms" }
+      }
+    },
+    {
+      "title": "Redis Write Success/Failure Rates",
+      "description": "Rate of successful and failed Redis writes from Flink operators.",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 40 },
+      "targets": [
+        {
+          "expr": "rate(betsafe_flink_redis_write_success_total[1m])",
+          "legendFormat": "Success — {{prefix}}"
+        },
+        {
+          "expr": "rate(betsafe_flink_redis_write_failure_total[1m])",
+          "legendFormat": "Failure — {{prefix}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "color": { "mode": "palette-classic" }, "unit": "ops" }
+      }
+    },
+    {
+      "title": "Late Events/sec",
+      "description": "Rate of events routed to the late event side output per operator.",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 48 },
+      "targets": [
+        {
+          "expr": "rate(betsafe_flink_late_events_total[1m])",
+          "legendFormat": "{{operator}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "color": { "mode": "palette-classic" }, "unit": "ops" }
+      }
+    },
+    {
+      "title": "Feature Freshness",
+      "description": "Seconds since the most recent feature update across all players. Lower is better.",
+      "type": "gauge",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 48 },
+      "targets": [
+        {
+          "expr": "betsafe_flink_feature_freshness_seconds"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "min": 0,
+          "max": 60,
+          "thresholds": {
+            "steps": [
+              { "color": "green", "value": 0 },
+              { "color": "yellow", "value": 5 },
+              { "color": "red", "value": 15 }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "title": "Kafka Consumer Lag — Flink",
+      "description": "Consumer lag for the Flink processor consumer group per topic and partition.",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 56 },
+      "targets": [
+        {
+          "expr": "betsafe_flink_kafka_consumer_lag",
+          "legendFormat": "{{topic}} - p{{partition}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "color": { "mode": "palette-classic" }, "unit": "short" }
+      }
+    },
+    {
+      "title": "Session Created/Expired Rates",
+      "description": "Rate of new sessions created and sessions expired (30min inactivity).",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 56 },
+      "targets": [
+        {
+          "expr": "rate(betsafe_flink_session_created_total[1m])",
+          "legendFormat": "Created"
+        },
+        {
+          "expr": "rate(betsafe_flink_session_expired_total[1m])",
+          "legendFormat": "Expired"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "color": { "mode": "palette-classic" }, "unit": "ops" }
+      }
+    },
+    {
+      "title": "High Risk Flags Triggered",
+      "description": "Rate of players flagged as high risk (loss streak >= 5).",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 64 },
+      "targets": [
+        {
+          "expr": "rate(betsafe_flink_high_risk_flag_total[1m])",
+          "legendFormat": "High Risk Flags"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "color": { "mode": "palette-classic" }, "unit": "ops" }
+      }
+    },
+    {
+      "title": "Checkpoint Duration and Failures",
+      "description": "Last checkpoint duration (ms) and cumulative checkpoint failure count.",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 64 },
+      "targets": [
+        {
+          "expr": "betsafe_flink_checkpoint_duration_ms",
+          "legendFormat": "Duration (ms)"
+        },
+        {
+          "expr": "betsafe_flink_checkpoint_failure_total",
+          "legendFormat": "Failures (cumulative)"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "color": { "mode": "palette-classic" }, "unit": "short" }
+      }
+    }
+  ],
+  "refresh": "10s",
+  "schemaVersion": 39,
+  "tags": ["betsafe", "phase1", "phase2"],
+  "templating": { "list": [] },
+  "time": { "from": "now-15m", "to": "now" },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "BetSafe Phase 1 & Phase 2",
+  "uid": "betsafe-phase1",
+  "version": 1
+}
